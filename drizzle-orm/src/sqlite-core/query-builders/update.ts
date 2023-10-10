@@ -11,36 +11,35 @@ import { type DrizzleTypeError, mapUpdateSet, orderSelectedFields, type UpdateSe
 import type { SelectedFields, SelectedFieldsOrdered } from './select.types.ts';
 
 export interface SQLiteUpdateConfig {
-	where?: SQL | undefined;
-	set: UpdateSet;
-	table: SQLiteTable;
-	returning?: SelectedFieldsOrdered;
+  where?: SQL | undefined;
+  set: UpdateSet;
+  table: SQLiteTable;
+  returning?: SelectedFieldsOrdered;
+  limit?: number;
 }
 
-export type SQLiteUpdateSetSource<TTable extends SQLiteTable> =
-	& {
-		[Key in keyof TTable['_']['columns']]?:
-			| GetColumnData<TTable['_']['columns'][Key], 'query'>
-			| SQL;
-	}
-	& {};
+export type SQLiteUpdateSetSource<TTable extends SQLiteTable> = {
+  [Key in keyof TTable['_']['columns']]?:
+    | GetColumnData<TTable['_']['columns'][Key], 'query'>
+    | SQL;
+} & {};
 
 export class SQLiteUpdateBuilder<
-	TTable extends SQLiteTable,
-	TResultType extends 'sync' | 'async',
-	TRunResult,
+  TTable extends SQLiteTable,
+  TResultType extends 'sync' | 'async',
+  TRunResult
 > {
-	static readonly [entityKind]: string = 'SQLiteUpdateBuilder';
+  static readonly [entityKind]: string = 'SQLiteUpdateBuilder';
 
-	declare readonly _: {
-		readonly table: TTable;
-	};
+  declare readonly _: {
+    readonly table: TTable;
+  };
 
-	constructor(
-		protected table: TTable,
-		protected session: SQLiteSession<any, any, any, any>,
-		protected dialect: SQLiteDialect,
-	) {}
+  constructor(
+    protected table: TTable,
+    protected session: SQLiteSession<any, any, any, any>,
+    protected dialect: SQLiteDialect
+  ) {}
 
 	set(values: SQLiteUpdateSetSource<TTable>): SQLiteUpdateBase<TTable, TResultType, TRunResult> {
 		return new SQLiteUpdateBase(this.table, mapUpdateSet(this.table, values), this.session, this.dialect);
@@ -161,18 +160,18 @@ export class SQLiteUpdateBase<
 {
 	static readonly [entityKind]: string = 'SQLiteUpdate';
 
-	/** @internal */
-	config: SQLiteUpdateConfig;
+  /** @internal */
+  config: SQLiteUpdateConfig;
 
-	constructor(
-		table: TTable,
-		set: UpdateSet,
-		private session: SQLiteSession<any, any, any, any>,
-		private dialect: SQLiteDialect,
-	) {
-		super();
-		this.config = { set, table };
-	}
+  constructor(
+    table: TTable,
+    set: UpdateSet,
+    private session: SQLiteSession<any, any, any, any>,
+    private dialect: SQLiteDialect
+  ) {
+    super();
+    this.config = { set, table };
+  }
 
 	where(where: SQL | undefined): SQLiteUpdateWithout<this, TDynamic, 'where'> {
 		this.config.where = where;
@@ -190,15 +189,22 @@ export class SQLiteUpdateBase<
 		return this as any;
 	}
 
-	/** @internal */
-	getSQL(): SQL {
-		return this.dialect.buildUpdateQuery(this.config);
-	}
+  /** @internal */
+  getSQL(): SQL {
+    return this.dialect.buildUpdateQuery(this.config);
+  }
 
-	toSQL(): Query {
-		const { typings: _typings, ...rest } = this.dialect.sqlToQuery(this.getSQL());
-		return rest;
-	}
+  toSQL(): Query {
+    const { typings: _typings, ...rest } = this.dialect.sqlToQuery(
+      this.getSQL()
+    );
+    return rest;
+  }
+
+  limit(limit: number): Omit<this, 'limit'> {
+    this.config.limit = limit;
+    return this;
+  }
 
 	prepare(isOneTimeQuery?: boolean): SQLiteUpdatePrepare<this> {
 		return this.session[isOneTimeQuery ? 'prepareOneTimeQuery' : 'prepareQuery'](
@@ -208,21 +214,17 @@ export class SQLiteUpdateBase<
 		) as SQLiteUpdatePrepare<this>;
 	}
 
-	run: ReturnType<this['prepare']>['run'] = (placeholderValues) => {
-		return this.prepare(true).run(placeholderValues);
-	};
+  run: ReturnType<this['prepare']>['run'] = (placeholderValues) => {
+    return this.prepare(true).run(placeholderValues);
+  };
 
-	all: ReturnType<this['prepare']>['all'] = (placeholderValues) => {
-		return this.prepare(true).all(placeholderValues);
-	};
+  all: ReturnType<this['prepare']>['all'] = (placeholderValues) => {
+    return this.prepare(true).all(placeholderValues);
+  };
 
-	get: ReturnType<this['prepare']>['get'] = (placeholderValues) => {
-		return this.prepare(true).get(placeholderValues);
-	};
-
-	values: ReturnType<this['prepare']>['values'] = (placeholderValues) => {
-		return this.prepare(true).values(placeholderValues);
-	};
+  get: ReturnType<this['prepare']>['get'] = (placeholderValues) => {
+    return this.prepare(true).get(placeholderValues);
+  };
 
 	override async execute(): Promise<SQLiteUpdateExecute<this>> {
 		return (this.config.returning ? this.all() : this.run()) as SQLiteUpdateExecute<this>;
